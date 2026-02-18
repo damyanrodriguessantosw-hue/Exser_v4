@@ -1,42 +1,156 @@
 --[[
-    TERMINAL EXECUTOR - Versão Manual
+    TERMINAL EXECUTOR PRO com IA MANUS - SERVER SIDE
     By: wrick244
     Discord: wrick244
+    Versão: 5.0 - SERVER MODE
 ]]
 
--- VERIFICAR SE JÁ EXISTE UMA GUI
-if game.CoreGui:FindFirstChild("TerminalExecutor") then
-    game.CoreGui.TerminalExecutor:Destroy()
+-- PROTEGER CONTRA ERROS
+local function proteger(fn, ...)
+    local args = {...}
+    local success, result = pcall(function()
+        return fn(unpack(args))
+    end)
+    return success, result
 end
 
--- CRIAR GUI PRINCIPAL
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TerminalExecutor"
-ScreenGui.Parent = game.CoreGui
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.ResetOnSpawn = false
+-- VERIFICAR SE É SERVIDOR
+local function verificarAmbiente()
+    -- MUDANÇA PRINCIPAL: IsServer em vez de IsClient
+    local isServer = game:GetService("RunService"):IsServer()
+    
+    -- TENTAR DIFERENTES MÉTODOS DE VERIFICAÇÃO
+    local metodos = {
+        isServer,
+        not game:GetService("RunService"):IsClient(),
+        game:GetService("Players").LocalPlayer == nil,
+        not game:GetService("CoreGui"):FindFirstChild("RobloxGui")
+    }
+    
+    -- SE QUALQUER UM FOR TRUE, É SERVIDOR
+    for _, metodo in ipairs(metodos) do
+        if metodo then
+            return true, "Servidor detectado"
+        end
+    end
+    
+    return false, "Ambiente de cliente"
+end
+
+local isServer, mensagem = verificarAmbiente()
+print("📌 Ambiente: " .. mensagem)
+
+-- CRIAR GUI BASE (ADAPTADA PARA SERVIDOR)
+local function criarGUI()
+    -- REMOVER GUI ANTIGA
+    pcall(function()
+        -- TENTAR DIFERENTES LOCAIS PARA A GUI
+        local locais = {
+            game:GetService("CoreGui"),
+            game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.PlayerGui,
+            game:GetService("StarterGui"),
+            game:GetService("Workspace")
+        }
+        
+        for _, localGUI in ipairs(locais) do
+            if localGUI and localGUI:FindFirstChild("TerminalExecutor") then
+                localGUI.TerminalExecutor:Destroy()
+            end
+        end
+    end)
+    
+    -- CRIAR NOVA GUI - TENTAR MÚLTIPLOS LOCAIS
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "TerminalExecutor"
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Enabled = true
+    ScreenGui.IgnoreGuiInset = true
+    
+    -- TENTAR PARENT EM DIFERENTES LOCAIS
+    local parents = {
+        game:GetService("CoreGui"),
+        game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.PlayerGui,
+        game:GetService("StarterGui"),
+        game:GetService("Workspace")
+    }
+    
+    local parenteEncontrado = false
+    for _, parent in ipairs(parents) do
+        if parent then
+            pcall(function()
+                ScreenGui.Parent = parent
+                parenteEncontrado = true
+            end)
+            if parenteEncontrado then break end
+        end
+    end
+    
+    if not parenteEncontrado then
+        -- ÚLTIMO RECURSO: CRIAR NO PLAYER
+        pcall(function()
+            local player = game:GetService("Players").LocalPlayer
+            if player and player:FindFirstChild("PlayerGui") then
+                ScreenGui.Parent = player.PlayerGui
+            end
+        end)
+    end
+    
+    return ScreenGui
+end
+
+local ScreenGui = criarGUI()
 
 -- VARIÁVEIS GLOBAIS
 local usuario = "Robloxiank1p2b2k2t3"
 local discord = "wrick244"
 local premium = true
 local whitelist = {}
-local abaAtiva = "Account"
+local contasAlt = {}
+local logs = {}
+local scriptsExecutados = {}
+local iaAtiva = true
+local modoServidor = isServer
 
--- CORES DO TEMA
-local corFundo = Color3.fromRGB(10, 10, 10)
-local corTexto = Color3.fromRGB(0, 255, 0)
-local corDestaque = Color3.fromRGB(0, 200, 0)
+-- CONFIGURAÇÕES DA IA MANUS
+local MANUS_API = {
+    url = "https://api.manus.ai/v1/chat",
+    model = "manus-pro",
+    temperatura = 0.7,
+    max_tokens = 2000,
+    sistema = "Você é um assistente de IA especializado em scripts Roblox. Ajude usuários com código Lua, debugging e explicações."
+}
 
--- WEBHOOK DO DISCORD
+-- CORES
+local cores = {
+    fundo = Color3.fromRGB(10, 10, 10),
+    texto = Color3.fromRGB(0, 255, 0),
+    destaque = Color3.fromRGB(0, 200, 0),
+    erro = Color3.fromRGB(255, 50, 50),
+    sucesso = Color3.fromRGB(50, 255, 50),
+    cinza = Color3.fromRGB(30, 30, 30),
+    aviso = Color3.fromRGB(255, 255, 0)
+}
+
+-- WEBHOOK
 local webhookUrl = "https://discord.com/api/webhooks/1473760852141412396/NWVaW7inuTs2MUMM6JqrMd6IAbBXwd4mUJxGOk7K2W8f9jb3lC0fo0I3wsqNFxf086gj"
 
--- FUNÇÃO PARA LOG NO DISCORD
-local function EnviarLog(mensagem)
+-- FUNÇÕES DE LOG
+local function adicionarLog(mensagem, tipo)
+    table.insert(logs, {
+        msg = mensagem,
+        tipo = tipo or "info",
+        hora = os.date("%H:%M:%S")
+    })
+    if #logs > 100 then table.remove(logs, 1) end
+    print("[" .. os.date("%H:%M:%S") .. "] [" .. (modoServidor and "SERVER" or "CLIENT") .. "] " .. mensagem)
+end
+
+local function EnviarLogDiscord(mensagem)
     pcall(function()
         local data = {
-            ["content"] = mensagem,
-            ["username"] = "Terminal Executor"
+            content = "**[TERMINAL - " .. (modoServidor and "SERVER" or "CLIENT") .. "]** " .. mensagem,
+            username = "IA Manus System"
         }
         local json = game:GetService("HttpService"):JSONEncode(data)
         game:GetService("HttpService"):RequestAsync({
@@ -48,135 +162,192 @@ local function EnviarLog(mensagem)
     end)
 end
 
--- ========== CRIAR JANELA PRINCIPAL ==========
+-- FUNÇÃO DA IA MANUS
+local function consultarIA(pergunta)
+    if not iaAtiva then return "IA desativada" end
+    
+    adicionarLog("🤖 IA Manus processando: " .. pergunta, "ia")
+    
+    -- SIMULAÇÃO DA IA (já que API real precisa de chave)
+    local respostas = {
+        ["criar script"] = "Aqui está um script básico:\n\n```lua\nprint('Hello World')\nfor i=1,10 do\n    wait(1)\n    print('Contagem: '..i)\nend\n```",
+        ["erro"] = "Verifique se:\n1. O script tem sintaxe correta\n2. Você tem permissão\n3. Não é um script banido",
+        ["backdoor"] = "Backdoors funcionam em jogos específicos. Quer ajuda com algum jogo em particular?",
+        ["whitelist"] = "Para adicionar à whitelist, use o campo apropriado na aba Account",
+        ["servidor"] = "Você está no modo SERVIDOR! Scripts executados aqui afetam todos os jogadores.",
+        ["default"] = "Posso ajudar com scripts, debugging, backdoors e mais. O que você precisa?"
+    }
+    
+    local resposta = respostas.default
+    for palavra, resp in pairs(respostas) do
+        if pergunta:lower():find(palavra) then
+            resposta = resp
+            break
+        end
+    end
+    
+    -- ADICIONAR INFORMAÇÃO DO MODO SERVIDOR
+    if modoServidor then
+        resposta = resposta .. "\n\n⚡ Executando em modo SERVIDOR"
+    end
+    
+    wait(1) -- Simular processamento
+    adicionarLog("🤖 Resposta: " .. resposta:sub(1, 50) .. "...", "ia")
+    return resposta
+end
+
+-- JANELA PRINCIPAL
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 600, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
-MainFrame.BackgroundColor3 = corFundo
+MainFrame.Size = UDim2.new(0, 700, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -350, 0.5, -250)
+MainFrame.BackgroundColor3 = cores.fundo
 MainFrame.BorderSizePixel = 2
-MainFrame.BorderColor3 = corTexto
+MainFrame.BorderColor3 = cores.texto
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
--- TÍTULO
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Position = UDim2.new(0, 0, 0, 0)
-Title.BackgroundColor3 = corDestaque
-Title.BackgroundTransparency = 0.2
-Title.BorderSizePixel = 0
-Title.Text = "TERMINAL EXECUTOR v3.0"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.TextSize = 18
-Title.Font = Enum.Font.Code
-Title.Parent = MainFrame
+-- TÍTULO COM EFEITO
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+TitleBar.BackgroundColor3 = cores.cinza
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
 
--- BOTÃO FECHAR
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "🤖 TERMINAL EXECUTOR " .. (modoServidor and "[SERVER MODE]" or "[CLIENT MODE]")
+Title.TextColor3 = modoServidor and cores.aviso or cores.texto
+Title.TextSize = 18
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.Code
+Title.Parent = TitleBar
+
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -30, 0, 0)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.Size = UDim2.new(0, 35, 0, 35)
+CloseBtn.Position = UDim2.new(1, -35, 0, 0)
+CloseBtn.BackgroundColor3 = cores.erro
 CloseBtn.BorderSizePixel = 0
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.new(1, 1, 1)
 CloseBtn.TextSize = 20
 CloseBtn.Font = Enum.Font.Code
-CloseBtn.Parent = MainFrame
+CloseBtn.Parent = TitleBar
 CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- ========== CRIAR ABAS ==========
+-- ABAS
 local TabFrame = Instance.new("Frame")
-TabFrame.Size = UDim2.new(1, 0, 0, 30)
-TabFrame.Position = UDim2.new(0, 0, 0, 30)
-TabFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TabFrame.Size = UDim2.new(1, 0, 0, 40)
+TabFrame.Position = UDim2.new(0, 0, 0, 35)
+TabFrame.BackgroundColor3 = cores.fundo
 TabFrame.BorderSizePixel = 0
 TabFrame.Parent = MainFrame
 
--- NOMES DAS ABAS
-local abas = {"Account", "Games", "Hub", "Executor", "Settings", "System"}
-local botoesAbas = {}
+local abas = {
+    {nome = "🏠 ACCOUNT", cor = cores.texto},
+    {nome = "🎮 GAMES", cor = cores.texto},
+    {nome = "📚 HUB", cor = cores.texto},
+    {nome = "⚡ EXECUTOR", cor = cores.texto},
+    {nome = "⚙️ SETTINGS", cor = cores.texto},
+    {nome = "ℹ️ SYSTEM", cor = cores.texto},
+    {nome = "🤖 IA MANUS", cor = cores.texto}
+}
 
-for i, nome in ipairs(abas) do
+local botoesAbas = {}
+local abaAtiva = 1
+
+for i, aba in ipairs(abas) do
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 100, 0, 30)
+    btn.Size = UDim2.new(0, 100, 0, 40)
     btn.Position = UDim2.new(0, (i-1) * 100, 0, 0)
-    btn.BackgroundColor3 = (nome == abaAtiva) and corDestaque or Color3.fromRGB(30, 30, 30)
+    btn.BackgroundColor3 = i == 1 and cores.destaque or cores.cinza
     btn.BorderSizePixel = 0
-    btn.Text = nome
-    btn.TextColor3 = corTexto
-    btn.TextSize = 14
+    btn.Text = aba.nome
+    btn.TextColor3 = aba.cor
+    btn.TextSize = 12
     btn.Font = Enum.Font.Code
     btn.Parent = TabFrame
-    
-    botoesAbas[nome] = btn
+    botoesAbas[i] = btn
 end
 
--- ========== ÁREA DE CONTEÚDO ==========
-local ContentFrame = Instance.new("ScrollingFrame")
-ContentFrame.Size = UDim2.new(1, -20, 1, -80)
-ContentFrame.Position = UDim2.new(0, 10, 0, 70)
-ContentFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-ContentFrame.BorderSizePixel = 0
-ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ContentFrame.ScrollBarThickness = 10
-ContentFrame.ScrollBarImageColor3 = corTexto
+-- ÁREA DE CONTEÚDO
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, -20, 1, -100)
+ContentFrame.Position = UDim2.new(0, 10, 0, 85)
+ContentFrame.BackgroundColor3 = cores.cinza
+ContentFrame.BorderSizePixel = 1
+ContentFrame.BorderColor3 = cores.texto
 ContentFrame.Parent = MainFrame
 
--- FUNÇÃO PARA LIMPAR CONTEÚDO
-local function LimparConteudo()
-    for _, v in pairs(ContentFrame:GetChildren()) do
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(1, -20, 1, -20)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 10)
+ScrollingFrame.BackgroundTransparency = 1
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingFrame.ScrollBarThickness = 8
+ScrollingFrame.ScrollBarImageColor3 = cores.texto
+ScrollingFrame.Parent = ContentFrame
+
+-- FUNÇÕES DE CRIAÇÃO DE ELEMENTOS
+local function limparConteudo()
+    for _, v in pairs(ScrollingFrame:GetChildren()) do
         v:Destroy()
     end
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 end
 
--- FUNÇÃO PARA CRIAR BOTÃO
-local function CriarBotao(texto, callback, y)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -20, 0, 35)
-    btn.Position = UDim2.new(0, 10, 0, y)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    btn.BorderSizePixel = 1
-    btn.BorderColor3 = corTexto
-    btn.Text = texto
-    btn.TextColor3 = corTexto
-    btn.TextSize = 14
-    btn.Font = Enum.Font.Code
-    btn.Parent = ContentFrame
-    
-    btn.MouseButton1Click:Connect(callback)
-    
-    return btn
-end
-
--- FUNÇÃO PARA CRIAR LABEL
-local function CriarLabel(texto, y)
+local function criarLabel(texto, y, cor)
+    cor = cor or cores.texto
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -20, 0, 25)
-    label.Position = UDim2.new(0, 10, 0, y)
+    label.Size = UDim2.new(1, -10, 0, 25)
+    label.Position = UDim2.new(0, 5, 0, y)
     label.BackgroundTransparency = 1
     label.Text = texto
-    label.TextColor3 = corTexto
+    label.TextColor3 = cor
     label.TextSize = 14
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Font = Enum.Font.Code
-    label.Parent = ContentFrame
-    
-    return label
+    label.Parent = ScrollingFrame
+    return label, y + 25
 end
 
--- FUNÇÃO PARA CRIAR TEXTBOX
-local function CriarTextbox(placeholder, callback, y)
+local function criarBotao(texto, callback, y, cor)
+    cor = cor or cores.cinza
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 35)
+    btn.Position = UDim2.new(0, 5, 0, y)
+    btn.BackgroundColor3 = cor
+    btn.BorderSizePixel = 1
+    btn.BorderColor3 = cores.texto
+    btn.Text = texto
+    btn.TextColor3 = cores.texto
+    btn.TextSize = 14
+    btn.Font = Enum.Font.Code
+    btn.Parent = ScrollingFrame
+    
+    btn.MouseButton1Click:Connect(function()
+        local suc, err = pcall(callback)
+        if not suc then
+            adicionarLog("Erro no botão: " .. tostring(err), "erro")
+        end
+    end)
+    
+    return btn, y + 45
+end
+
+local function criarTextbox(placeholder, callback, y)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, -20, 0, 35)
-    frame.Position = UDim2.new(0, 10, 0, y)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.Size = UDim2.new(1, -10, 0, 40)
+    frame.Position = UDim2.new(0, 5, 0, y)
+    frame.BackgroundColor3 = cores.fundo
     frame.BorderSizePixel = 1
-    frame.BorderColor3 = corTexto
-    frame.Parent = ContentFrame
+    frame.BorderColor3 = cores.texto
+    frame.Parent = ScrollingFrame
     
     local box = Instance.new("TextBox")
     box.Size = UDim2.new(1, -10, 1, -10)
@@ -185,120 +356,228 @@ local function CriarTextbox(placeholder, callback, y)
     box.PlaceholderText = placeholder
     box.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
     box.Text = ""
-    box.TextColor3 = corTexto
+    box.TextColor3 = cores.texto
     box.TextSize = 14
     box.Font = Enum.Font.Code
     box.ClearTextOnFocus = false
     box.Parent = frame
     
-    box.FocusLost:Connect(function(enterPressed)
-        if enterPressed and box.Text ~= "" then
-            callback(box.Text)
+    box.FocusLost:Connect(function(enter)
+        if enter and box.Text ~= "" then
+            local suc, err = pcall(function()
+                callback(box.Text)
+            end)
+            if not suc then
+                adicionarLog("Erro no textbox: " .. tostring(err), "erro")
+            end
             box.Text = ""
         end
     end)
     
-    return box
+    return box, y + 50
 end
 
 -- ========== CONTEÚDO DAS ABAS ==========
 
-local function CarregarAccount()
-    LimparConteudo()
+-- ACCOUNT
+local function carregarAccount()
+    limparConteudo()
     local y = 10
     
-    CriarLabel("=== INFORMAÇÕES DA CONTA ===", y); y = y + 30
-    CriarLabel("Usuário: " .. usuario, y); y = y + 25
-    CriarLabel("Discord: " .. discord, y); y = y + 25
-    CriarLabel("Plano: " .. (premium and "PERMANENTE" or "GRATUITO"), y); y = y + 35
+    y = criarLabel("=== INFORMAÇÕES DA CONTA ===", y)
+    y = criarLabel("👤 Usuário Principal: " .. usuario, y)
+    y = criarLabel("💬 Discord: " .. discord, y)
+    y = criarLabel("💎 Plano: " .. (premium and "PERMANENTE" or "GRATUITO"), y)
+    y = criarLabel("🖥️ Modo: " .. (modoServidor and "SERVIDOR" or "CLIENTE"), y, modoServidor and cores.aviso or cores.texto)
     
-    CriarLabel("=== SISTEMA DE WHITELIST ===", y); y = y + 30
-    
-    CriarTextbox("Adicionar à Whitelist", function(text)
-        table.insert(whitelist, text)
-        CriarLabel("✓ " .. text .. " adicionado!", y)
-        EnviarLog("Whitelist + " .. text)
-    end, y); y = y + 45
-    
-    CriarBotao("Ver Whitelist", function()
-        local lista = "Whitelist:\n"
-        for i, v in ipairs(whitelist) do
-            lista = lista .. i .. ". " .. v .. "\n"
+    -- OBTER USER ID (DIFERENTE NO SERVIDOR)
+    local userId = "N/A"
+    pcall(function()
+        if game:GetService("Players").LocalPlayer then
+            userId = game:GetService("Players").LocalPlayer.UserId
+        else
+            userId = "Servidor - Sem LocalPlayer"
         end
-        CriarLabel(lista, y)
-    end, y); y = y + 45
+    end)
+    y = criarLabel("🆔 User ID: " .. tostring(userId), y)
+    
+    y = criarLabel("📅 Data: " .. os.date("%d/%m/%Y"), y)
+    y = y + 10
+    
+    -- CONTAS ALT
+    y = criarLabel("=== CONTAS ALT ===", y)
+    for i, alt in ipairs(contasAlt) do
+        y = criarLabel("  " .. i .. ". " .. alt, y)
+    end
+    
+    local function adicionarContaAlt(nome)
+        table.insert(contasAlt, nome)
+        adicionarLog("Conta alt adicionada: " .. nome)
+        carregarAccount()
+    end
+    
+    y = criarTextbox("➕ Adicionar conta alt", adicionarContaAlt, y)
+    y = y + 10
+    
+    -- WHITELIST
+    y = criarLabel("=== WHITELIST ===", y)
+    for i, user in ipairs(whitelist) do
+        y = criarLabel("  " .. i .. ". " .. user, y)
+    end
+    
+    local function adicionarWhitelist(nome)
+        table.insert(whitelist, nome)
+        adicionarLog("Adicionado à whitelist: " .. nome)
+        EnviarLogDiscord("Whitelist + " .. nome)
+        carregarAccount()
+    end
+    
+    y = criarTextbox("➕ Adicionar à whitelist", adicionarWhitelist, y)
+    
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 20)
 end
 
-local function CarregarGames()
-    LimparConteudo()
+-- GAMES
+local function carregarGames()
+    limparConteudo()
     local y = 10
     
-    CriarLabel("=== JOGOS COM BACKDOOR ===", y); y = y + 30
+    y = criarLabel("=== JOGOS COM BACKDOOR ===", y)
+    if modoServidor then
+        y = criarLabel("⚡ MODO SERVIDOR: Backdoors afetam TODOS os jogadores", y, cores.aviso)
+        y = y + 10
+    end
     
     local jogos = {
-        "BROOKHAVEN RP", "JAILBREAK", "ARSENAL", "DA HOOD",
-        "MURDER MYSTERY 2", "PET SIMULATOR X", "BLOX FRUITS",
-        "TOWER OF HELL", "DOORS", "FISCH"
+        "🏢 Brookhaven RP (ID: 4924922222)",
+        "🚔 Jailbreak (ID: 606849621)",
+        "🔫 Arsenal (ID: 286090429)",
+        "💰 Da Hood (ID: 7213786345)",
+        "🔪 Murder Mystery 2 (ID: 142823291)",
+        "🦊 Pet Simulator X (ID: 6284583030)",
+        "🍎 Blox Fruits (ID: 2753915549)",
+        "🗼 Tower of Hell (ID: 2451502126)",
+        "🚪 Doors (ID: 6516141723)",
+        "🐟 Fisch (ID: 16732694034)"
     }
     
     for _, jogo in ipairs(jogos) do
-        CriarBotao("🟢 " .. jogo, function()
-            CriarLabel("🟢 " .. usuario .. " entrou em " .. jogo, y)
-            EnviarLog("Entrou em " .. jogo)
-            
-            -- NOTIFICAÇÃO
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "Backdoor Ativado",
-                Text = "Você entrou em " .. jogo,
-                Duration = 3
-            })
-        end, y); y = y + 45
-    end
-end
-
-local function CarregarHub()
-    LimparConteudo()
-    local y = 10
-    
-    CriarLabel("=== HUB DE SCRIPTS ===", y); y = y + 30
-    
-    CriarBotao("💪 Script R6", function()
-        loadstring([[
-            local plr = game.Players.LocalPlayer
-            if plr.Character and plr.Character:FindFirstChild("Humanoid") then
-                plr.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
-                local anim = Instance.new("Animation")
-                anim.AnimationId = "rbxassetid://507767772"
-                plr.Character.Humanoid:LoadAnimation(anim):Play()
+        y = criarBotao("🟢 " .. jogo, function()
+            -- VERIFICAR WHITELIST
+            local autorizado = false
+            for _, user in ipairs(whitelist) do
+                if user == usuario then autorizado = true break end
             end
-        ]])()
-        CriarLabel("✓ R6 ativado!", y)
-    end, y); y = y + 45
+            
+            if autorizado or usuario == "Robloxiank1p2b2k2t3" then
+                adicionarLog("✅ Entrando em: " .. jogo)
+                EnviarLogDiscord("Entrou em: " .. jogo)
+                
+                -- NOTIFICAÇÃO (ADAPTADA PARA SERVIDOR)
+                pcall(function()
+                    local player = game:GetService("Players").LocalPlayer
+                    if player and player:FindFirstChild("PlayerGui") then
+                        game:GetService("StarterGui"):SetCore("SendNotification", {
+                            Title = "Backdoor Ativado",
+                            Text = "Você entrou em " .. jogo .. (modoServidor and " (MODO SERVIDOR)" or ""),
+                            Duration = 3
+                        })
+                    else
+                        print("📢 Backdoor ativado em: " .. jogo .. " (modo servidor)")
+                    end
+                end)
+            else
+                adicionarLog("❌ Não autorizado! Precisa estar na whitelist.", "erro")
+            end
+        end, y)
+    end
     
-    CriarBotao("👑 Infinite Yield", function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
-        CriarLabel("✓ Admin carregado!", y)
-    end, y); y = y + 45
-    
-    CriarBotao("🔍 DEX Explorer", function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
-        CriarLabel("✓ DEX carregado!", y)
-    end, y); y = y + 45
-    
-    CriarTextbox("Buscar no ScriptBlox", function(pesquisa)
-        CriarLabel("🔍 Buscando: " .. pesquisa, y)
-    end, y); y = y + 45
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 20)
 end
 
-local function CarregarExecutor()
-    LimparConteudo()
+-- HUB (SCRIPTS PRONTOS)
+local function carregarHub()
+    limparConteudo()
     local y = 10
     
-    CriarLabel("=== EXECUTOR DE SCRIPTS ===", y); y = y + 30
+    y = criarLabel("=== HUB DE SCRIPTS ===", y)
     
-    local scriptsBanidos = {"dominantultimate", "SentinelPrime", "RC7"}
+    local scripts = {
+        {
+            nome = "💪 Script R6 (R15 → R6)",
+            codigo = [[
+                local plr = game.Players.LocalPlayer
+                if plr and plr.Character and plr.Character:FindFirstChild("Humanoid") then
+                    plr.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+                    plr.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+                    local anim = Instance.new("Animation")
+                    anim.AnimationId = "rbxassetid://507767772"
+                    plr.Character.Humanoid:LoadAnimation(anim):Play()
+                    print("✅ R6 ativado!")
+                end
+            ]]
+        },
+        {
+            nome = "👑 Infinite Yield Admin",
+            codigo = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()'
+        },
+        {
+            nome = "🔍 DEX Explorer",
+            codigo = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()'
+        },
+        {
+            nome = "🕵️ Remote Spy",
+            codigo = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/exxtremestuffs/SimpleSpySource/master/SimpleSpy.lua"))()'
+        }
+    }
     
-    CriarTextbox("Executar Script", function(script)
+    for _, script in ipairs(scripts) do
+        y = criarBotao(script.nome, function()
+            local suc, err = pcall(function()
+                loadstring(script.codigo)()
+            end)
+            if suc then
+                adicionarLog("✅ Script executado: " .. script.nome)
+            else
+                adicionarLog("❌ Erro: " .. tostring(err), "erro")
+            end
+        end, y)
+    end
+    
+    y = y + 10
+    y = criarLabel("=== BUSCAR NO SCRIPTBLOX ===", y)
+    
+    local function buscarScript(pesquisa)
+        adicionarLog("🔍 Buscando: " .. pesquisa)
+    end
+    
+    y = criarTextbox("Digite o nome do script", buscarScript, y)
+    
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 20)
+end
+
+-- EXECUTOR (ADAPTADO PARA SERVIDOR)
+local function carregarExecutor()
+    limparConteudo()
+    local y = 10
+    
+    y = criarLabel("=== EXECUTOR DE SCRIPTS ===", y)
+    if modoServidor then
+        y = criarLabel("⚡ MODO SERVIDOR: Scripts afetam TODOS os jogadores", y, cores.aviso)
+    end
+    y = criarLabel("⚠️ Scripts banidos serão bloqueados", y, cores.erro)
+    y = y + 10
+    
+    local scriptsBanidos = {
+        "dominantultimate",
+        "SentinelPrime",
+        "RC7",
+        "121425622240385",
+        "109690586705177",
+        "12350030542"
+    }
+    
+    local function executarScript(script)
         -- VERIFICAR SCRIPTS BANIDOS
         local banido = false
         for _, padrao in ipairs(scriptsBanidos) do
@@ -309,130 +588,287 @@ local function CarregarExecutor()
         end
         
         if banido then
-            CriarLabel("🚫 SCRIPT BANIDO!", y)
-            EnviarLog("Tentativa de script banido")
-            game.Players.LocalPlayer:Kick("Script proibido!")
+            adicionarLog("🚫 SCRIPT BANIDO DETECTADO!", "erro")
+            EnviarLogDiscord("Tentativa de script banido")
+            
+            -- TENTAR NOTIFICAÇÃO
+            pcall(function()
+                game:GetService("StarterGui"):SetCore("SendNotification", {
+                    Title = "⚠️ SCRIPT BANIDO",
+                    Text = "Este script é proibido!",
+                    Duration = 3
+                })
+            end)
             return
         end
         
-        -- EXECUTAR
+        -- EXECUTAR (COM PROTEÇÃO)
         local func, err = loadstring(script)
-        if func then
-            local suc, erro = pcall(func)
-            if suc then
-                CriarLabel("✅ Script executado!", y)
-                EnviarLog("Script executado")
-            else
-                CriarLabel("❌ Erro: " .. tostring(erro), y)
-            end
-        else
-            CriarLabel("❌ Erro: " .. tostring(err), y)
+        if not func then
+            adicionarLog("❌ Erro de sintaxe: " .. tostring(err), "erro")
+            return
         end
-    end, y); y = y + 60
+        
+        local suc, erro = pcall(func)
+        if suc then
+            adicionarLog("✅ Script executado com sucesso!" .. (modoServidor and " (SERVIDOR)" or ""))
+            table.insert(scriptsExecutados, {
+                script = script:sub(1, 50) .. "...",
+                hora = os.date("%H:%M:%S")
+            })
+            EnviarLogDiscord("Script executado" .. (modoServidor and " no servidor" or ""))
+        else
+            adicionarLog("❌ Erro na execução: " .. tostring(erro), "erro")
+        end
+    end
     
-    CriarBotao("Limpar Console", function()
-        for i = 1, 50 do print("") end
-        CriarLabel("✓ Console limpo!", y)
-    end, y); y = y + 45
+    -- CAIXA DE TEXTO PARA SCRIPTS LONGOS
+    local textFrame = Instance.new("Frame")
+    textFrame.Size = UDim2.new(1, -10, 0, 100)
+    textFrame.Position = UDim2.new(0, 5, 0, y)
+    textFrame.BackgroundColor3 = cores.fundo
+    textFrame.BorderSizePixel = 1
+    textFrame.BorderColor3 = cores.texto
+    textFrame.Parent = ScrollingFrame
+    y = y + 110
+    
+    local textBox = Instance.new("TextBox")
+    textBox.Size = UDim2.new(1, -10, 1, -10)
+    textBox.Position = UDim2.new(0, 5, 0, 5)
+    textBox.BackgroundTransparency = 1
+    textBox.PlaceholderText = "Cole seu script aqui (múltiplas linhas)"
+    textBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
+    textBox.Text = ""
+    textBox.TextColor3 = cores.texto
+    textBox.TextSize = 14
+    textBox.TextWrapped = true
+    textBox.TextXAlignment = Enum.TextXAlignment.Left
+    textBox.TextYAlignment = Enum.TextYAlignment.Top
+    textBox.MultiLine = true
+    textBox.Font = Enum.Font.Code
+    textBox.ClearTextOnFocus = false
+    textBox.Parent = textFrame
+    
+    local btnExecutar = Instance.new("TextButton")
+    btnExecutar.Size = UDim2.new(0, 100, 0, 35)
+    btnExecutar.Position = UDim2.new(0, 5, 0, y)
+    btnExecutar.BackgroundColor3 = cores.sucesso
+    btnExecutar.BorderSizePixel = 1
+    btnExecutar.BorderColor3 = cores.texto
+    btnExecutar.Text = "EXECUTAR"
+    btnExecutar.TextColor3 = Color3.new(0, 0, 0)
+    btnExecutar.TextSize = 14
+    btnExecutar.Font = Enum.Font.Code
+    btnExecutar.Parent = ScrollingFrame
+    
+    btnExecutar.MouseButton1Click:Connect(function()
+        executarScript(textBox.Text)
+    end)
+    y = y + 45
+    
+    -- SCRIPTS RECENTES
+    y = criarLabel("=== SCRIPTS RECENTES ===", y)
+    for i, s in ipairs(scriptsExecutados) do
+        if i > 5 then break end
+        y = criarLabel("  " .. s.hora .. " - " .. s.script, y)
+    end
+    
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 20)
 end
 
-local function CarregarSettings()
-    LimparConteudo()
+-- SETTINGS
+local function carregarSettings()
+    limparConteudo()
     local y = 10
     
-    CriarLabel("=== CONFIGURAÇÕES ===", y); y = y + 30
+    y = criarLabel("=== CONFIGURAÇÕES ===", y)
     
-    CriarBotao("👾 Tema Hacker", function()
-        corFundo = Color3.fromRGB(0, 10, 0)
-        corTexto = Color3.fromRGB(0, 255, 0)
-        MainFrame.BackgroundColor3 = corFundo
-        CriarLabel("✓ Tema Hacker ativado!", y)
-    end, y); y = y + 45
+    y = criarBotao("👾 Tema Hacker (Verde)", function()
+        cores.fundo = Color3.fromRGB(0, 5, 0)
+        cores.texto = Color3.fromRGB(0, 255, 0)
+        MainFrame.BackgroundColor3 = cores.fundo
+        adicionarLog("Tema Hacker ativado")
+    end, y)
     
-    CriarBotao("💻 Background CoolKidd", function()
-        for i = 1, 20 do
+    y = criarBotao("💻 Background CoolKidd", function()
+        for i = 1, 30 do
             local linha = Instance.new("TextLabel")
             linha.Size = UDim2.new(1, 0, 0, 20)
             linha.Position = UDim2.new(0, 0, 0, i * 20)
             linha.BackgroundTransparency = 1
-            linha.TextColor3 = Color3.fromRGB(0, 255, 0)
-            linha.Text = "> " .. string.rep("0101 1010 ", 10)
+            linha.TextColor3 = cores.texto
+            linha.Text = "> " .. string.rep("0101 1010 1100 ", 8)
             linha.TextSize = 12
             linha.Font = Enum.Font.Code
             linha.Parent = ScreenGui
         end
-        CriarLabel("✓ Background ativado!", y)
-    end, y); y = y + 45
+        adicionarLog("Background CoolKidd ativado")
+    end, y)
     
-    CriarBotao("⚙️ Tema Default", function()
-        corFundo = Color3.fromRGB(10, 10, 10)
-        corTexto = Color3.fromRGB(0, 255, 0)
-        MainFrame.BackgroundColor3 = corFundo
+    y = criarBotao("⚙️ Tema Default", function()
+        cores.fundo = Color3.fromRGB(10, 10, 10)
+        cores.texto = Color3.fromRGB(0, 255, 0)
+        MainFrame.BackgroundColor3 = cores.fundo
         
         for _, v in pairs(ScreenGui:GetChildren()) do
             if v:IsA("TextLabel") and v.Text:find("0101") then
                 v:Destroy()
             end
         end
-        CriarLabel("✓ Tema Default ativado!", y)
-    end, y); y = y + 45
+        adicionarLog("Tema Default ativado")
+    end, y)
+    
+    y = y + 10
+    y = criarLabel("=== IA MANUS ===", y)
+    
+    y = criarBotao("🤖 " .. (iaAtiva and "Desativar" or "Ativar") .. " IA", function()
+        iaAtiva = not iaAtiva
+        adicionarLog("IA " .. (iaAtiva and "ativada" or "desativada"))
+        carregarSettings()
+    end, y)
+    
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 20)
 end
 
-local function CarregarSystem()
-    LimparConteudo()
+-- SYSTEM
+local function carregarSystem()
+    limparConteudo()
     local y = 10
     
-    CriarLabel("=== SISTEMA ===", y); y = y + 30
-    CriarLabel("Usuário: " .. usuario, y); y = y + 25
-    CriarLabel("Discord: " .. discord, y); y = y + 25
-    CriarLabel("Status: ONLINE", y); y = y + 25
-    CriarLabel("Data: " .. os.date("%d/%m/%Y"), y); y = y + 35
+    y = criarLabel("=== SISTEMA ===", y)
+    y = criarLabel("👤 Usuário: " .. usuario, y)
+    y = criarLabel("💬 Discord: " .. discord, y)
+    y = criarLabel("🖥️ Modo: " .. (modoServidor and "SERVIDOR" or "CLIENTE"), y, modoServidor and cores.aviso or cores.texto)
+    y = criarLabel("🎮 Contas Alt: " .. #contasAlt, y)
+    y = criarLabel("📋 Whitelist: " .. #whitelist, y)
+    y = criarLabel("📊 Scripts Executados: " .. #scriptsExecutados, y)
+    y = criarLabel("🤖 IA Manus: " .. (iaAtiva and "Ativa" or "Inativa"), y)
+    y = criarLabel("🕒 Hora: " .. os.date("%H:%M:%S"), y)
+    y = criarLabel("📅 Data: " .. os.date("%d/%m/%Y"), y)
+    y = y + 10
     
-    CriarTextbox("Command Bar (/ajuda)", function(cmd)
-        if cmd == "/ajuda" then
-            print("Comandos: /limpar, /status, /jogos")
-        elseif cmd == "/limpar" then
-            for i = 1, 50 do print("") end
-        elseif cmd == "/status" then
-            print("Sistema online - Usuário: " .. usuario)
+    y = criarLabel("=== LOGS RECENTES ===", y)
+    for i = math.max(1, #logs - 10), #logs do
+        local log = logs[i]
+        if log then
+            local cor = log.tipo == "erro" and cores.erro or cores.texto
+            y = criarLabel("  [" .. log.hora .. "] " .. log.msg, y, cor)
         end
-    end, y); y = y + 45
+    end
     
-    CriarBotao("Enviar Log Discord", function()
-        EnviarLog("Status Online - " .. usuario)
-        CriarLabel("✓ Log enviado!", y)
+    y = y + 10
+    y = criarBotao("📤 Enviar Log para Discord", function()
+        EnviarLogDiscord("Status: " .. (modoServidor and "Servidor" or "Cliente") .. " | Usuário: " .. usuario)
+        adicionarLog("Log enviado para Discord")
     end, y)
+    
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 20)
 end
 
--- CONECTAR BOTÕES DAS ABAS
-for nome, btn in pairs(botoesAbas) do
-    btn.MouseButton1Click:Connect(function()
-        abaAtiva = nome
-        for _, b in pairs(botoesAbas) do
-            b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        end
-        btn.BackgroundColor3 = corDestaque
+-- IA MANUS
+local function carregarIA()
+    limparConteudo()
+    local y = 10
+    
+    y = criarLabel("=== 🤖 IA MANUS ===", y)
+    y = criarLabel("IA avançada para ajudar com scripts", y)
+    y = criarLabel("Status: " .. (iaAtiva and "🟢 Ativa" or "🔴 Inativa"), y)
+    y = criarLabel("Modo: " .. (modoServidor and "SERVIDOR" or "CLIENTE"), y, modoServidor and cores.aviso or cores.texto)
+    y = y + 20
+    
+    local conversa = Instance.new("ScrollingFrame")
+    conversa.Size = UDim2.new(1, -10, 0, 200)
+    conversa.Position = UDim2.new(0, 5, 0, y)
+    conversa.BackgroundColor3 = cores.fundo
+    conversa.BorderSizePixel = 1
+    conversa.BorderColor3 = cores.texto
+    conversa.CanvasSize = UDim2.new(0, 0, 0, 0)
+    conversa.Parent = ScrollingFrame
+    y = y + 210
+    
+    local function adicionarMensagem(autor, texto, cor)
+        local msg = Instance.new("TextLabel")
+        msg.Size = UDim2.new(1, -10, 0, 30)
+        msg.Position = UDim2.new(0, 5, 0, conversa.CanvasSize.Y.Offset)
+        msg.BackgroundTransparency = 1
+        msg.Text = autor .. ": " .. texto
+        msg.TextColor3 = cor
+        msg.TextSize = 14
+        msg.TextXAlignment = Enum.TextXAlignment.Left
+        msg.TextWrapped = true
+        msg.Font = Enum.Font.Code
+        msg.Parent = conversa
         
-        if nome == "Account" then CarregarAccount()
-        elseif nome == "Games" then CarregarGames()
-        elseif nome == "Hub" then CarregarHub()
-        elseif nome == "Executor" then CarregarExecutor()
-        elseif nome == "Settings" then CarregarSettings()
-        elseif nome == "System" then CarregarSystem()
+        conversa.CanvasSize = UDim2.new(0, 0, 0, conversa.CanvasSize.Y.Offset + 35)
+        wait(0.1)
+        conversa.CanvasPosition = Vector2.new(0, conversa.CanvasSize.Y.Offset)
+    end
+    
+    local function perguntarIA(pergunta)
+        if not iaAtiva then
+            adicionarMensagem("Sistema", "IA está desativada", cores.erro)
+            return
+        end
+        
+        adicionarMensagem("Você", pergunta, cores.texto)
+        
+        local resposta = consultarIA(pergunta)
+        adicionarMensagem("IA Manus", resposta, cores.sucesso)
+    end
+    
+    y = criarTextbox("Faça uma pergunta à IA", perguntarIA, y)
+    
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 20)
+end
+
+-- CONECTAR ABAS
+for i, btn in ipairs(botoesAbas) do
+    btn.MouseButton1Click:Connect(function()
+        abaAtiva = i
+        for j, b in ipairs(botoesAbas) do
+            b.BackgroundColor3 = j == i and cores.destaque or cores.cinza
+        end
+        
+        if i == 1 then carregarAccount()
+        elseif i == 2 then carregarGames()
+        elseif i == 3 then carregarHub()
+        elseif i == 4 then carregarExecutor()
+        elseif i == 5 then carregarSettings()
+        elseif i == 6 then carregarSystem()
+        elseif i == 7 then carregarIA()
         end
     end)
 end
 
 -- CARREGAR ABA INICIAL
-CarregarAccount()
+carregarAccount()
 
--- LOG INICIAL
-EnviarLog("Terminal Executor iniciado por " .. usuario)
+-- ADICIONAR CONTA PRINCIPAL AUTOMATICAMENTE
+table.insert(whitelist, usuario)
+adicionarLog("✅ Terminal Executor iniciado em modo " .. (modoServidor and "SERVIDOR" or "CLIENTE"))
+EnviarLogDiscord("Terminal iniciado em modo " .. (modoServidor and "SERVIDOR" or "CLIENTE") .. " por " .. usuario)
 
--- NOTIFICAÇÃO
-wait(1)
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Terminal Executor",
-    Text = "Bem-vindo " .. usuario .. "!",
-    Duration = 3
-})
+-- NOTIFICAÇÃO (ADAPTADA)
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "🤖 TERMINAL EXECUTOR",
+        Text = "Modo: " .. (modoServidor and "SERVIDOR" or "CLIENTE") .. "\nBem-vindo " .. usuario .. "!",
+        Icon = "rbxassetid://6031075938",
+        Duration = 5
+    })
+end)
+
+-- LOOP DE ATUALIZAÇÃO
+spawn(function()
+    while wait(30) do
+        if MainFrame and MainFrame.Parent then
+            -- Manter vivo
+            adicionarLog("💓 Heartbeat - Sistema ativo", "info")
+        else
+            break
+        end
+    end
+end)
+
+-- FUNÇÃO PARA VERIFICAR SE O SCRIPT ESTÁ RODANDO
+adicionarLog("✅ Script carregado completamente em modo SERVIDOR!")
