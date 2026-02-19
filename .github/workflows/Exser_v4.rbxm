@@ -276,6 +276,95 @@ local function serverExecutor()
         return sucesso
     end
     
+    -- ========== BACKDOOR DO MEEP CITY (BASEADO NO TUBERS93) ==========
+    local function ativarMeepCityBackdoor()
+        print("🏡 Ativando backdoor do MeepCity (Tubers93 style)...")
+        
+        -- TÉCNICA 1: SPAM DE BALÕES (Famoso no ataque de 2020)
+        spawn(function()
+            for i = 1, 100 do
+                local balloon = Instance.new("Part")
+                balloon.Size = Vector3.new(3, 3, 3)
+                balloon.BrickColor = BrickColor.random()
+                balloon.Material = Enum.Material.Neon
+                balloon.Position = game.Players.LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(math.random(-20,20), math.random(10,30), math.random(-20,20))
+                balloon.Anchored = false
+                balloon.Parent = workspace
+                
+                local bodyVelocity = Instance.new("BodyVelocity")
+                bodyVelocity.Velocity = Vector3.new(math.random(-30,30), math.random(20,50), math.random(-30,30))
+                bodyVelocity.Parent = balloon
+                
+                wait(0.05)
+            end
+            print("🎈 100 balões spamados (igual ao ataque de 2020)!")
+        end)
+        
+        -- TÉCNICA 2: COPY AVATAR (Característica do MeepCity)
+        spawn(function()
+            wait(2)
+            local players = game:GetService("Players")
+            local targets = {}
+            for _, p in pairs(players:GetPlayers()) do
+                if p ~= players.LocalPlayer then
+                    table.insert(targets, p)
+                end
+            end
+            
+            if #targets > 0 then
+                local alvo = targets[math.random(1, #targets)]
+                if alvo and alvo.Character then
+                    local meuChar = players.LocalPlayer.Character
+                    if meuChar then
+                        -- Copiar roupas e aparência
+                        meuChar.Humanoid:ApplyDescription(alvo.Character.Humanoid:GetAppliedDescription())
+                        print("👤 Avatar copiado de " .. alvo.Name)
+                    end
+                end
+            end
+        end)
+        
+        -- TÉCNICA 3: AUTO FARM DE MOEDAS
+        spawn(function()
+            while wait(0.3) do
+                -- Procurar moedas pelo mapa
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if obj.Name:find("Coin") or obj.Name:find("Money") or obj.Name:find("Cash") then
+                        if game.Players.LocalPlayer.Character then
+                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = obj.CFrame
+                            wait(0.1)
+                        end
+                    end
+                end
+            end
+        end)
+        
+        -- TÉCNICA 4: NOCLIP (Atravessar paredes)
+        spawn(function()
+            local player = game.Players.LocalPlayer
+            local noclip = true
+            game:GetService("RunService").Stepped:Connect(function()
+                if noclip and player.Character then
+                    for _, part in pairs(player.Character:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+            print("🚪 Noclip ativado!")
+        end)
+        
+        -- NOTIFICAÇÃO
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "🏡 MEEP CITY BACKDOOR",
+            Text = "Backdoor do Tubers93 ativado!\nBalões + Copy + Auto Farm",
+            Duration = 5
+        })
+        
+        return true
+    end
+
     -- HOOK NO CHAT PARA COMANDOS
     local function chatHook()
         local players = game:GetService("Players")
@@ -306,6 +395,7 @@ local function serverExecutor()
                         end
                         
                     elseif cmd == "backdoor" then
+                        -- LISTA ATUALIZADA COM MEEP CITY
                         local jogos = {
                             brookhaven = 4924922222,
                             jailbreak = 606849621,
@@ -313,14 +403,35 @@ local function serverExecutor()
                             dahood = 7213786345,
                             mm2 = 142823291,
                             petsim = 6284583030,
-                            bloxfruits = 2753915549
+                            bloxfruits = 2753915549,
+                            tower = 2451502126,
+                            doors = 6516141723,
+                            fisch = 16732694034,
+                            meepcity = 898988855  -- NOVO!
                         }
                         
                         local jogo = args[1]
                         if jogo and jogos[jogo] then
-                            player:SendMessage("🔄 Teleportando...")
+                            player:SendMessage("🔄 Teleportando para " .. jogo .. "...")
+                            
+                            -- SE FOR MEEP CITY, ATIVAR BACKDOOR ESPECIAL
+                            if jogo == "meepcity" then
+                                player:SendMessage("🏡 Ativando backdoor do MeepCity (Tubers93)...")
+                                spawn(function()
+                                    wait(2)
+                                    ativarMeepCityBackdoor()
+                                end)
+                            end
+                            
                             game:GetService("TeleportService"):Teleport(jogos[jogo], player)
+                        else
+                            player:SendMessage("❌ Jogo não encontrado. Disponíveis: brookhaven, jailbreak, arsenal, dahood, mm2, petsim, bloxfruits, tower, doors, fisch, meepcity")
                         end
+                        
+                    elseif cmd == "meepcity" or cmd == "mc" then
+                        -- COMANDO DIRETO PARA MEEP CITY
+                        player:SendMessage("🏡 Ativando backdoor do MeepCity...")
+                        ativarMeepCityBackdoor()
                         
                     elseif cmd == "serverinfo" then
                         local info = string.format([[
@@ -330,6 +441,14 @@ Players: %d
 Uptime: %.0fs
                         ]], game.JobId, #players:GetPlayers(), tick())
                         player:SendMessage(info)
+                        
+                    elseif cmd == "ajuda" or cmd == "help" then
+                        player:SendMessage("📋 COMANDOS DISPONÍVEIS:")
+                        player:SendMessage("!exec <script> - Executa script")
+                        player:SendMessage("!load <url> - Carrega script de URL")
+                        player:SendMessage("!backdoor <jogo> - Teleporta para jogo")
+                        player:SendMessage("!meepcity - Ativa backdoor do MeepCity")
+                        player:SendMessage("!serverinfo - Info do servidor")
                     end
                 end
             end)
@@ -341,6 +460,7 @@ Uptime: %.0fs
     print("✅ BYPASS COMPLETO - EXECUTOR SERVER SIDE ATIVO")
     print("👤 Dono: " .. config.dono)
     print("📡 Status: " .. (bypass3 and "Conectado ao servidor" or "Modo limitado"))
+    print("🏡 MeepCity backdoor carregado (Tubers93 style)")
     
     -- SISTEMA DE HEARTBEAT
     spawn(function()
@@ -358,12 +478,14 @@ local iniciado = pcall(serverExecutor)
 if iniciado then
     print("🔥 SCRIPT EXECUTADO COM SUCESSO!")
     print("📌 Use !ajuda no chat para ver os comandos")
+    print("🏡 MeepCity backdoor disponível! Use !meepcity")
     
     -- MENSAGEM NO CHAT DO JOGO
     pcall(function()
         for _, player in pairs(game:GetService("Players"):GetPlayers()) do
             player:SendMessage("🔥 Server Side Backdoor ativo!")
             player:SendMessage("👤 Dono: wrick244")
+            player:SendMessage("🏡 MeepCity backdoor: !meepcity")
         end
     end)
     
@@ -371,7 +493,7 @@ if iniciado then
     pcall(function()
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "🔥 BYPASS ATIVO",
-            Text = "Server Side Execution OK!",
+            Text = "MeepCity backdoor carregado!",
             Duration = 5
         })
     end)
@@ -381,7 +503,7 @@ else
     -- MÉTODO ALTERNATIVO
     pcall(function()
         loadstring([[
-            -- TENTATIVA 2: BYPASS DIREto
+            -- TENTATIVA 2: BYPASS DIRETO
             local env = getfenv()
             local newenv = {}
             for k,v in pairs(env) do newenv[k] = v end
@@ -405,3 +527,4 @@ _G.emergencyExec = function(script)
 end
 
 print("✅ Script finalizado - Sistema de bypass carregado")
+print("🏡 MeepCity backdoor incluído (baseado no Tubers93 2020/2022)")
